@@ -1,0 +1,10 @@
+.git
+README.md
+xtext/
+.vscode/
+x
+
+*Dockerfile*
+*docker-compose*
+node_modules
+npm-debug.log
