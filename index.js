@@ -5,7 +5,7 @@ const { initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 
 var admin = require("firebase-admin");
-
+var mongo = require("./mongo")
 var serviceAccount = require("./service-file.json");
 
 admin.initializeApp({
@@ -21,20 +21,25 @@ const typeDefs = gql`
 type User {
     id: String
     name: String
+    email: String
     offersMade: Int
     ordersMade: Int
 }
 
 type Query {
-    getUser(id: String!): User
-    getUserByName(name: String): User
+    getSelf: User
+    getUser(fid: String!): User
+    getUserByName(name: String!): User
+    getUserByFID(fid: String!): User
+    delete(fid: String!): Int
+
     getAny: Int
     getStats(id: String!): String
     getSecrets: Int
 }
 
 type Mutation {
-    setUserName(id: Int!, name: String!): String
+    setEmail(fid: Int!, email: String!): String
 }
 
 `;
@@ -44,49 +49,43 @@ type Mutation {
 const resolvers = {
 
     Query: {
-  
-        getAny: () => {return null},
 
-        getUser: (parent, args, context, info) => {
-            return mockUsers[args.id]
-        },
-    
-        getSecrets: () => {
-            /*
+        getSelf: (parent, args, context, info) => {
 
             if (!context.token) {
                 console.log("HEADER HAS NO TOKEN")
-
-                return mockUsers[userId]
             }
             
             const token = context.token
             console.log("HEADER HAS TOKEN")
-
+            
             // idToken comes from the client app
             return getAuth()
             .verifyIdToken(token)
-            .then((decodedToken) => {
+            .then(async (decodedToken) => {
                 const uid = decodedToken.uid;
-                console.log("TOKEN OK: UID:", uid)
-                return mockUsers[uid]
+                const email = decodedToken.email;
+                var u = await mongo.getUser({ fid: uid })
+                u.email = email
+                u.fid = uid
+                return u
             })
             .catch((error) => {
-                // Handle error
-                console.log("TOKEN FAIL", error)
+                
             });
-            */
-
-            return 1
         },
 
-        getUserByName: ({name}) => {
-            for (var key in mockUsers) {
-                if (mockUsers[key].name == name) return mockUsers[key]
-            }
-            return null
+        getUser: (parent, args, context, info) => {
+            console.log("GET USER ", args.fid)
+            return mongo.getUser({ fid: args.fid })
         },
     
+        getUserByName: (parent, args, context, info) => {
+            return mongo.getUser({ name: args.name })
+        },
+
+        getAny: () => {return null},
+
         getStats: () => {
             const x = {ordersMade: 1, offersMade: 2}
             return JSON.stringify(x)
@@ -95,35 +94,13 @@ const resolvers = {
     },
 
     Mutation: {
-        setUserName: ({id, name}) => {
+        setEmail: ({id, name}) => {
             return mockUsers[id].name = name
         },
     }
   
 };
 
-
-class User {
-    constructor(id, name) {
-      this.id = id
-      this.name = name
-      this.offersMade = 3
-    }
-
-    ordersMade() {
-        return 3
-    }
-}
-
-
-var mockUsers = {
-    "1": {name: "joe", age: 22, friends: ["mia", "lea"]},
-    "2": {name: "mia", age: 33, friends: ["joe"]},
-    "3": {name: "lea", age: 44, friends: ["kim, joe"]},
-    "4": {name: "kim", age: 44, friends: ["lea"]},
-    "Xh1RXSzRYqVzJ3cZVktb7X1Ec9x1": (new User("Xh1RXSzRYqVzJ3cZVktb7X1Ec9x1", "joe")),
-    "X6pLU9PK5XObMKB6i6VimIHJPIn1": (new User("X6pLU9PK5XObMKB6i6VimIHJPIn1", "tester")),
-}
 
 
 const apolloServer = new ApolloServer({
@@ -150,8 +127,6 @@ const apolloServer = new ApolloServer({
         return { token };
       },
 });
-
-
 
 
 
